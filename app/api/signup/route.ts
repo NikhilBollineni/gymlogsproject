@@ -81,12 +81,20 @@ export async function POST(request: Request) {
       }
 
       // RLS policy error - most common issue
-      if (error.code === '42501' || error.message.includes('permission denied') || error.message.includes('new row violates row-level security')) {
+      if (error.code === '42501' || error.code === 'P0001' || error.message.includes('permission denied') || error.message.includes('new row violates row-level security') || error.message.includes('policy')) {
         console.error('RLS policy error. The INSERT policy is blocking the request.');
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        console.error('Error hint:', error.hint);
+        console.error('Full error object:', JSON.stringify(error, null, 2));
+        
+        // Try to get more info about the current user context
+        const { data: { user } } = await supabase.auth.getUser();
+        console.error('Current Supabase user:', user ? user.id : 'null (anonymous)');
+        
         return NextResponse.json({ 
-          error: 'Database permission error. Please check RLS policies. Make sure you ran the SQL script to allow anonymous inserts.' 
+          error: `Database permission error (Code: ${error.code}). Details: ${error.message}. Please check RLS policies and ensure the anon role has INSERT permission.` 
         }, { status: 500 });
       }
 
