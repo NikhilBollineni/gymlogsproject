@@ -23,12 +23,12 @@ ALTER TABLE test_users ENABLE ROW LEVEL SECURITY;
 -- This is CRITICAL - anon role needs explicit table permissions
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT SELECT, INSERT ON test_users TO anon;
-GRANT USAGE, SELECT ON SEQUENCE test_users_id_seq TO anon;
+-- Note: No sequence needed - we use gen_random_uuid() which doesn't require a sequence
 
 -- Step 5: Grant permissions to authenticated role
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT SELECT, INSERT ON test_users TO authenticated;
-GRANT USAGE, SELECT ON SEQUENCE test_users_id_seq TO authenticated;
+-- Note: No sequence needed - we use gen_random_uuid() which doesn't require a sequence
 
 -- Step 6: Create RLS policies
 -- Policy 1: Allow anonymous users to INSERT
