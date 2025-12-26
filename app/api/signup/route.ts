@@ -16,9 +16,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    // If Supabase is not configured, log and return success (for development)
+    // Check if Supabase is configured
     if (!supabase) {
-      console.log('Test User Signup (Supabase not configured):', { email, xProfile });
+      console.error('Supabase not configured. Missing environment variables.');
+      // Still return success for better UX, but log the issue
       return NextResponse.json({ 
         success: true, 
         user: { 
@@ -26,7 +27,8 @@ export async function POST(request: Request) {
           email,
           xProfile: xProfile || null,
           timestamp: new Date().toISOString(),
-        } 
+        },
+        message: 'Signup received (database not configured)'
       });
     }
 
@@ -41,10 +43,16 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      // If table doesn't exist, log and return success
+      console.error('Supabase error:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+
+      // If table doesn't exist
       if (error.code === '42P01' || error.message.includes('does not exist')) {
         console.error('test_users table does not exist. Please run the migration SQL.');
-        console.log('Test User Signup (table missing):', { email, xProfile });
         return NextResponse.json({ 
           success: true, 
           user: { 
@@ -52,7 +60,8 @@ export async function POST(request: Request) {
             email,
             xProfile: xProfile || null,
             timestamp: new Date().toISOString(),
-          } 
+          },
+          message: 'Signup received (table not found - check database)'
         });
       }
       
@@ -65,8 +74,17 @@ export async function POST(request: Request) {
         });
       }
 
-      console.error('Error saving user to Supabase:', error);
-      return NextResponse.json({ error: 'Failed to save signup' }, { status: 500 });
+      // RLS policy error
+      if (error.code === '42501' || error.message.includes('permission denied')) {
+        console.error('RLS policy error. Check that the INSERT policy allows anon users.');
+        return NextResponse.json({ 
+          error: 'Database permission error. Please check RLS policies.' 
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({ 
+        error: `Database error: ${error.message}` 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ 
@@ -80,6 +98,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error in signup API:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ 
+      error: `Server error: ${errorMessage}` 
+    }, { status: 500 });
   }
 }

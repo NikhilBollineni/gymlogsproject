@@ -31,8 +31,10 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         body: JSON.stringify({ email, xProfile }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to sign up');
+        throw new Error(result.error || 'Failed to sign up');
       }
 
       setSuccess(true);
@@ -43,7 +45,9 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         setXProfile('');
       }, 2000);
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setError(errorMessage);
+      console.error('Signup error:', err);
     } finally {
       setLoading(false);
     }
