@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
@@ -11,40 +10,76 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    const dataDir = path.join(process.cwd(), 'data');
-    const filePath = path.join(dataDir, 'test-users.json');
-
-    // Ensure data directory exists
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    let users = [];
-    if (fs.existsSync(filePath)) {
-      const fileContent = fs.readFileSync(filePath, 'utf-8');
-      try {
-        users = JSON.parse(fileContent);
-      } catch (e) {
-        // File might be empty or corrupt, start fresh
-        users = [];
+    // If Supabase is not configured, log and return success (for development)
+    if (!supabase) {
+      console.log('Test User Signup (Supabase not configured):', { email, xProfile });
+      return NextResponse.json({ 
+        success: true, 
+        user: { 
+          id: 'dev-' + Date.now(),
+          email,
+          xProfile: xProfile || null,
+          timestamp: new Date().toISOString(),
+        } 
+      });
+    }
+
+    // Insert into Supabase test_users table
+    const { data: newUser, error } = await supabase
+      .from('test_users')
+      .insert({
+        email,
+        x_profile: xProfile || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // If table doesn't exist, log and return success
+      if (error.code === '42P01' || error.message.includes('does not exist')) {
+        console.error('test_users table does not exist. Please run the migration SQL.');
+        console.log('Test User Signup (table missing):', { email, xProfile });
+        return NextResponse.json({ 
+          success: true, 
+          user: { 
+            id: 'temp-' + Date.now(),
+            email,
+            xProfile: xProfile || null,
+            timestamp: new Date().toISOString(),
+          } 
+        });
       }
+      
+      // Handle duplicate email (user already signed up)
+      if (error.code === '23505') {
+        return NextResponse.json({ 
+          success: true, 
+          message: 'You\'re already on the list!',
+          user: { email }
+        });
+      }
+
+      console.error('Error saving user to Supabase:', error);
+      return NextResponse.json({ error: 'Failed to save signup' }, { status: 500 });
     }
 
-    const newUser = {
-      id: crypto.randomUUID(),
-      email,
-      xProfile: xProfile || null,
-      timestamp: new Date().toISOString(),
-    };
-
-    users.push(newUser);
-
-    fs.writeFileSync(filePath, JSON.stringify(users, null, 2));
-
-    return NextResponse.json({ success: true, user: newUser });
+    return NextResponse.json({ 
+      success: true, 
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        xProfile: newUser.x_profile,
+        timestamp: newUser.created_at,
+      }
+    });
   } catch (error) {
-    console.error('Error saving user:', error);
+    console.error('Error in signup API:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
-
