@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     // Check if Supabase is configured
     if (!supabase) {
       console.error('Supabase not configured. Missing environment variables.');
+      console.error('Env check:', {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Missing',
+        key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Missing',
+      });
       // Still return success for better UX, but log the issue
       return NextResponse.json({ 
         success: true, 
@@ -32,6 +36,8 @@ export async function POST(request: Request) {
       });
     }
 
+    console.log('Attempting to insert test user:', { email, xProfile });
+
     // Insert into Supabase test_users table
     const { data: newUser, error } = await supabase
       .from('test_users')
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      console.error('Supabase error:', {
+      console.error('Supabase error details:', {
         code: error.code,
         message: error.message,
         details: error.details,
@@ -74,18 +80,22 @@ export async function POST(request: Request) {
         });
       }
 
-      // RLS policy error
-      if (error.code === '42501' || error.message.includes('permission denied')) {
-        console.error('RLS policy error. Check that the INSERT policy allows anon users.');
+      // RLS policy error - most common issue
+      if (error.code === '42501' || error.message.includes('permission denied') || error.message.includes('new row violates row-level security')) {
+        console.error('RLS policy error. The INSERT policy is blocking the request.');
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
         return NextResponse.json({ 
-          error: 'Database permission error. Please check RLS policies.' 
+          error: 'Database permission error. Please check RLS policies. Make sure you ran the SQL script to allow anonymous inserts.' 
         }, { status: 500 });
       }
 
       return NextResponse.json({ 
-        error: `Database error: ${error.message}` 
+        error: `Database error: ${error.message} (Code: ${error.code})` 
       }, { status: 500 });
     }
+
+    console.log('Successfully inserted test user:', newUser);
 
     return NextResponse.json({ 
       success: true, 
