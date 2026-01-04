@@ -50,11 +50,6 @@ export function CTASection() {
             </div>
           </motion.div>
         </div>
-
-        {/* Removed Footer Links & Copyright as requested */}
-        <div className="mt-24 pb-8 text-center">
-          {/* Empty footer area or could put a subtle logo mark here if desired, keeping it clean for now */}
-        </div>
       </section>
     </>
   );

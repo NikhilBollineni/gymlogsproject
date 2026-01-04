@@ -4,6 +4,7 @@ import { AnalyticsSection } from '@/components/landing/AnalyticsSection';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { FAQ } from '@/components/landing/FAQ';
 import { CTASection } from '@/components/landing/CTASection';
+import { Footer } from '@/components/landing/Footer';
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
       <FeatureGrid />
       <FAQ />
       <CTASection />
+      <Footer />
     </main>
   );
 }
